@@ -56,7 +56,9 @@ SIGN_KEY = 'tiebaclient!!!'
 UTF8 = "utf-8"
 SIGN = "sign"
 KW = "kw"
-email_msg = {}
+email_msg = {
+    'subject': ''
+}
 
 s = requests.Session()
 
