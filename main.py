@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 import os
 from email.header import Header
+from email.mime.text import MIMEText
 
 import requests
 import hashlib
@@ -56,9 +57,6 @@ SIGN_KEY = 'tiebaclient!!!'
 UTF8 = "utf-8"
 SIGN = "sign"
 KW = "kw"
-email_msg = {
-    'subject': ''
-}
 
 s = requests.Session()
 
@@ -184,13 +182,13 @@ def client_sign(bduss, tbs, fid, kw):
     return res
 
 
-def prepare_email(user_order, tieba_number):
+def prepare_email(user_order, tieba_number , message):
     subject = f"{time.strftime('%Y-%m-%d', time.localtime())} 第{user_order}个用户 签到{tieba_number}个贴吧"
+    message += subject
+    return message
 
-    email_msg['subject'] += subject
 
-
-def send_email():
+def send_email(msg):
     if 'HOST' not in ENV or 'FROM' not in ENV or 'TO' not in ENV or 'AUTH' not in ENV:
         logger.error("未配置邮箱")
         return
@@ -199,11 +197,13 @@ def send_email():
     TO = ENV['TO'].split('#')
     AUTH = ENV['AUTH']
 
-    email_msg['subject'] = Header(email_msg['subject'], 'utf-8')
+    message = MIMEText('百度贴吧签到', 'plain', 'utf-8')
+
+    message['subject'] = Header(msg, 'utf-8')
     smtp = smtplib.SMTP()
     smtp.connect(HOST)
     smtp.login(FROM, AUTH)
-    smtp.sendmail(FROM, TO, email_msg.as_string())
+    smtp.sendmail(FROM, TO, message.as_string())
     smtp.quit()
 
 
@@ -212,6 +212,7 @@ def main():
         logger.error("未配置BDUSS")
         return
     b = ENV['BDUSS'].split('#')
+    email_msg = ''
     for n, i in enumerate(b):
         logger.info("开始签到第" + str(n) + "个用户")
         tbs = get_tbs(i)
@@ -220,9 +221,9 @@ def main():
             time.sleep(random.randint(1, 5))
             client_sign(i, tbs, j["id"], j["name"])
         logger.info("完成第" + str(n) + "个用户签到")
-        prepare_email(str(n), len(favorites))
+        email_msg = prepare_email(str(n), len(favorites), email_msg)
 
-    send_email()
+    send_email(email_msg)
     logger.info("所有用户签到结束")
 
 
