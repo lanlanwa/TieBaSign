@@ -182,12 +182,6 @@ def client_sign(bduss, tbs, fid, kw):
     return res
 
 
-def prepare_email(user_order, tieba_number , message):
-    subject = f"{time.strftime('%Y-%m-%d', time.localtime())} 第{user_order}个用户 签到{tieba_number}个贴吧"
-    message += subject
-    return message
-
-
 def send_email(msg):
     if 'HOST' not in ENV or 'FROM' not in ENV or 'TO' not in ENV or 'AUTH' not in ENV:
         logger.error("未配置邮箱")
@@ -221,7 +215,7 @@ def main():
             time.sleep(random.randint(1, 5))
             client_sign(i, tbs, j["id"], j["name"])
         logger.info("完成第" + str(n) + "个用户签到")
-        email_msg = prepare_email(str(n), len(favorites), email_msg)
+        email_msg += f"{time.strftime('%Y-%m-%d', time.localtime())} 第{str(n)}个用户 签到{len(b)}个贴吧\n"
 
     send_email(email_msg)
     logger.info("所有用户签到结束")
