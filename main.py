@@ -191,9 +191,9 @@ def send_email(msg):
     TO = ENV['TO'].split('#')
     AUTH = ENV['AUTH']
 
-    message = MIMEText('百度贴吧签到', 'plain', 'utf-8')
+    message = MIMEText(msg, 'plain', 'utf-8')
 
-    message['subject'] = Header(msg, 'utf-8')
+    message['subject'] = Header('百度贴吧签到', 'utf-8')
     smtp = smtplib.SMTP()
     smtp.connect(HOST)
     smtp.login(FROM, AUTH)
@@ -208,13 +208,13 @@ def main():
     b = ENV['BDUSS'].split('#')
     email_msg = ''
     for n, i in enumerate(b):
-        logger.info("开始签到第" + str(n) + "个用户")
+        logger.info("开始签到第" + str(n + 1) + "个用户")
         tbs = get_tbs(i)
         favorites = get_favorite(i)
         for j in favorites:
             time.sleep(random.randint(1, 5))
             client_sign(i, tbs, j["id"], j["name"])
-        logger.info("完成第" + str(n + 1) + "个用户签到")
+        logger.info("完成第" + str(n) + "个用户签到")
         email_msg += f"{time.strftime('%Y-%m-%d', time.localtime())} 第{str(n + 1)}个用户 签到{len(favorites)}个贴吧\n"
 
     send_email(email_msg)
