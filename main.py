@@ -1,5 +1,7 @@
 # -*- coding:utf-8 -*-
 import os
+from email.header import Header
+
 import requests
 import hashlib
 import time
@@ -9,17 +11,14 @@ import random
 import datetime
 
 import smtplib
-from email.mime.text import MIMEText
-
 
 
 def beijing(sec, what):
     beijing_time = datetime.datetime.now() + datetime.timedelta(hours=8)
     return beijing_time.timetuple()
- 
- 
-logging.Formatter.converter = beijing
 
+
+logging.Formatter.converter = beijing
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -57,6 +56,7 @@ SIGN_KEY = 'tiebaclient!!!'
 UTF8 = "utf-8"
 SIGN = "sign"
 KW = "kw"
+email_msg = {}
 
 s = requests.Session()
 
@@ -78,7 +78,6 @@ def get_tbs(bduss):
 def get_favorite(bduss):
     logger.info("获取关注的贴吧开始")
     # 客户端关注的贴吧
-    returnData = {}
     i = 1
     data = {
         'BDUSS': bduss,
@@ -94,21 +93,21 @@ def get_favorite(bduss):
         'timestamp': str(int(time.time())),
         'vcode_tag': '11',
     }
-    data = encodeData(data)
+    data = encode_data(data)
     try:
         res = s.post(url=LIKIE_URL, data=data, timeout=5).json()
     except Exception as e:
         logger.error("获取关注的贴吧出错" + e)
         return []
-    returnData = res
-    if 'forum_list' not in returnData:
-        returnData['forum_list'] = []
-    if res['forum_list'] == []:
+    return_data = res
+    if 'forum_list' not in return_data:
+        return_data['forum_list'] = []
+    if not res['forum_list']:
         return {'gconforum': [], 'non-gconforum': []}
-    if 'non-gconforum' not in returnData['forum_list']:
-        returnData['forum_list']['non-gconforum'] = []
-    if 'gconforum' not in returnData['forum_list']:
-        returnData['forum_list']['gconforum'] = []
+    if 'non-gconforum' not in return_data['forum_list']:
+        return_data['forum_list']['non-gconforum'] = []
+    if 'gconforum' not in return_data['forum_list']:
+        return_data['forum_list']['gconforum'] = []
     while 'has_more' in res and res['has_more'] == '1':
         i = i + 1
         data = {
@@ -125,7 +124,7 @@ def get_favorite(bduss):
             'timestamp': str(int(time.time())),
             'vcode_tag': '11',
         }
-        data = encodeData(data)
+        data = encode_data(data)
         try:
             res = s.post(url=LIKIE_URL, data=data, timeout=5).json()
         except Exception as e:
@@ -134,12 +133,12 @@ def get_favorite(bduss):
         if 'forum_list' not in res:
             continue
         if 'non-gconforum' in res['forum_list']:
-            returnData['forum_list']['non-gconforum'].append(res['forum_list']['non-gconforum'])
+            return_data['forum_list']['non-gconforum'].append(res['forum_list']['non-gconforum'])
         if 'gconforum' in res['forum_list']:
-            returnData['forum_list']['gconforum'].append(res['forum_list']['gconforum'])
+            return_data['forum_list']['gconforum'].append(res['forum_list']['gconforum'])
 
     t = []
-    for i in returnData['forum_list']['non-gconforum']:
+    for i in return_data['forum_list']['non-gconforum']:
         if isinstance(i, list):
             for j in i:
                 if isinstance(j, list):
@@ -149,7 +148,7 @@ def get_favorite(bduss):
                     t.append(j)
         else:
             t.append(i)
-    for i in returnData['forum_list']['gconforum']:
+    for i in return_data['forum_list']['gconforum']:
         if isinstance(i, list):
             for j in i:
                 if isinstance(j, list):
@@ -163,7 +162,7 @@ def get_favorite(bduss):
     return t
 
 
-def encodeData(data):
+def encode_data(data):
     s = EMPTY_STR
     keys = data.keys()
     for i in sorted(keys):
@@ -178,62 +177,50 @@ def client_sign(bduss, tbs, fid, kw):
     logger.info("开始签到贴吧：" + kw)
     data = copy.copy(SIGN_DATA)
     data.update({BDUSS: bduss, FID: fid, KW: kw, TBS: tbs, TIMESTAMP: str(int(time.time()))})
-    data = encodeData(data)
+    data = encode_data(data)
     res = s.post(url=SIGN_URL, data=data, timeout=5).json()
     return res
 
-def send_email(sign_list):
-    if ('HOST' not in ENV or 'FROM' not in ENV or 'TO' not in ENV or 'AUTH' not in ENV):
+
+def prepare_email(user_order, tieba_number):
+    subject = f"{time.strftime('%Y-%m-%d', time.localtime())} 第{user_order}个用户 签到{tieba_number}个贴吧"
+
+    email_msg['subject'] += subject
+
+
+def send_email():
+    if 'HOST' not in ENV or 'FROM' not in ENV or 'TO' not in ENV or 'AUTH' not in ENV:
         logger.error("未配置邮箱")
         return
     HOST = ENV['HOST']
     FROM = ENV['FROM']
     TO = ENV['TO'].split('#')
     AUTH = ENV['AUTH']
-    length = len(sign_list)
-    subject = f"{time.strftime('%Y-%m-%d', time.localtime())} 签到{length}个贴吧"
-    body = """
-    <style>
-    .child {
-      background-color: rgba(173, 216, 230, 0.19);
-      padding: 10px;
-    }
 
-    .child * {
-      margin: 5px;
-    }
-    </style>
-    """
-    for i in sign_list:
-        body += f"""
-        <div class="child">
-            <div class="name"> 贴吧名称: { i['name'] }</div>
-            <div class="slogan"> 贴吧简介: { i['slogan'] }</div>
-        </div>
-        <hr>
-        """
-    msg = MIMEText(body, 'html', 'utf-8')
-    msg['subject'] = subject
+    email_msg['subject'] = Header(email_msg['subject'], 'utf-8')
     smtp = smtplib.SMTP()
     smtp.connect(HOST)
     smtp.login(FROM, AUTH)
-    smtp.sendmail(FROM, TO, msg.as_string())
+    smtp.sendmail(FROM, TO, email_msg.as_string())
     smtp.quit()
 
+
 def main():
-    if ('BDUSS' not in ENV):
+    if 'BDUSS' not in ENV:
         logger.error("未配置BDUSS")
         return
     b = ENV['BDUSS'].split('#')
     for n, i in enumerate(b):
-        logger.info("开始签到第" + str(n) + "个用户" + i)
+        logger.info("开始签到第" + str(n) + "个用户")
         tbs = get_tbs(i)
         favorites = get_favorite(i)
         for j in favorites:
-            time.sleep(random.randint(1,5))
+            time.sleep(random.randint(1, 5))
             client_sign(i, tbs, j["id"], j["name"])
         logger.info("完成第" + str(n) + "个用户签到")
-    send_email(favorites)
+        prepare_email(str(n), len(favorites))
+
+    send_email()
     logger.info("所有用户签到结束")
 
 
