@@ -11,6 +11,14 @@ import smtplib
 from email.mime.text import MIMEText
 
 
+
+def beijing(sec, what):
+    beijing_time = datetime.datetime.now() + datetime.timedelta(hours=8)
+    return beijing_time.timetuple()
+ 
+ 
+logging.Formatter.converter = beijing
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
